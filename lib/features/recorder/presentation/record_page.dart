@@ -233,34 +233,31 @@ class _RecordPageState extends State<RecordPage> {
                 'API: ${AppConfig.apiBaseUrl}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            if (_loadingCenters) const LoadingView(message: 'Loading centers...'),
+            if (_loadingCenters)
+              const LoadingView(message: 'Loading centers...'),
             if (_centersError != null && !_loadingCenters)
               Text(
                 _centersError!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
-            if (!_loadingCenters &&
-                _centersError == null &&
-                _centers.isEmpty)
+            if (!_loadingCenters && _centersError == null && _centers.isEmpty)
               const Text('No active centers available.'),
             if (!_loadingCenters && _centers.isNotEmpty) ...[
-              DropdownButtonFormField<String>(
-                value: _selectedCenterId,
-                decoration: const InputDecoration(
-                  labelText: 'Center',
-                  border: OutlineInputBorder(),
+              DropdownMenu<String>(
+                key: ValueKey(
+                  'center_${_centers.length}_$_selectedCenterId',
                 ),
-                items: _centers
-                    .map(
-                      (c) => DropdownMenuItem<String>(
-                        value: c.id,
-                        child: Text(c.name),
-                      ),
-                    )
-                    .toList(),
-                onChanged: _uploading || _recording
-                    ? null
-                    : (v) => setState(() => _selectedCenterId = v),
+                initialSelection: _selectedCenterId,
+                enabled: !_uploading && !_recording,
+                label: const Text('Center'),
+                onSelected: (v) => setState(() => _selectedCenterId = v),
+                dropdownMenuEntries: [
+                  for (final c in _centers)
+                    DropdownMenuEntry<String>(
+                      value: c.id,
+                      label: c.name,
+                    ),
+                ],
               ),
             ],
             const SizedBox(height: 24),

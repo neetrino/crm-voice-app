@@ -102,7 +102,8 @@ class _LoginPageState extends State<LoginPage> {
                 if (widget.bannerMessage != null) ...[
                   const SizedBox(height: 16),
                   Card(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Row(
