@@ -59,6 +59,19 @@ class ApiClient {
 
   Dio get dio => _dio;
 
+  Future<String?> getAccessToken() => _tokenStorage.getAccessToken();
+
+  String resolveUrl(String pathOrUrl) {
+    final uri = Uri.tryParse(pathOrUrl);
+    if (uri != null && uri.hasScheme) return pathOrUrl;
+
+    final base = AppConfig.apiBaseUrl.replaceFirst(RegExp(r'/$'), '');
+    final normalized =
+        pathOrUrl.startsWith('/api/') ? pathOrUrl.substring(4) : pathOrUrl;
+    final path = normalized.startsWith('/') ? normalized : '/$normalized';
+    return '$base$path';
+  }
+
   Future<Response<T>> getJson<T>(
     String path, {
     bool requiresAuth = true,
@@ -77,6 +90,21 @@ class ApiClient {
     bool requiresAuth = true,
   }) {
     return _dio.post<T>(
+      path,
+      data: data,
+      options: Options(
+        extra: {_extraAuth: requiresAuth},
+        headers: const {'Content-Type': 'application/json'},
+      ),
+    );
+  }
+
+  Future<Response<T>> patchJson<T>(
+    String path, {
+    Object? data,
+    bool requiresAuth = true,
+  }) {
+    return _dio.patch<T>(
       path,
       data: data,
       options: Options(

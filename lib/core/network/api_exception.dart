@@ -7,7 +7,7 @@ class ApiException implements Exception {
   final int? statusCode;
 
   static ApiException missingToken() =>
-      ApiException('Not signed in. Please log in again.', statusCode: 401);
+      ApiException('Սեսիան ավարտվել է, մուտք գործեք նորից', statusCode: 401);
 
   static ApiException fromDio(DioException e) {
     final code = e.response?.statusCode;
@@ -17,13 +17,13 @@ class ApiException implements Exception {
         e.type == DioExceptionType.sendTimeout ||
         e.type == DioExceptionType.receiveTimeout) {
       return ApiException(
-        'Request timed out. Check your network and try again.',
+        'Հարցման ժամանակը սպառվեց։ Ստուգեք կապը և փորձեք նորից։',
         statusCode: code,
       );
     }
     if (e.type == DioExceptionType.connectionError) {
       return ApiException(
-        'Cannot reach the server. Is the API running and URL correct?',
+        'Չհաջողվեց կապ հաստատել սերվերի հետ։',
         statusCode: code,
       );
     }
@@ -40,29 +40,29 @@ class ApiException implements Exception {
     switch (code) {
       case 400:
         return ApiException(
-          serverMsg ?? 'Invalid request. Please check your input.',
+          serverMsg ?? 'Սխալ հարցում։ Ստուգեք տվյալները։',
           statusCode: 400,
         );
       case 401:
         return ApiException(
-          serverMsg ?? 'Session expired. Please sign in again.',
+          serverMsg ?? 'Սեսիան ավարտվել է, մուտք գործեք նորից',
           statusCode: 401,
         );
       case 403:
         return ApiException(
-          serverMsg ?? 'You do not have permission for this action.',
+          serverMsg ?? 'Այս գործողության համար թույլտվություն չունեք։',
           statusCode: 403,
         );
       case 500:
       default:
         if (code != null && code >= 500) {
           return ApiException(
-            serverMsg ?? 'Server error. Please try again later.',
+            serverMsg ?? 'Սերվերի սխալ։ Փորձեք ավելի ուշ։',
             statusCode: code,
           );
         }
         return ApiException(
-          serverMsg ?? e.message ?? 'Something went wrong.',
+          serverMsg ?? e.message ?? 'Ինչ-որ բան սխալ ընթացավ։',
           statusCode: code,
         );
     }

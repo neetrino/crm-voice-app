@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'core/network/api_client.dart';
 import 'core/storage/token_storage.dart';
 import 'features/auth/presentation/login_page.dart';
-import 'features/recorder/presentation/record_page.dart';
+import 'features/recorder/presentation/recorder_shell_page.dart';
 
 class App extends StatefulWidget {
   const App({super.key});
@@ -42,7 +42,7 @@ class _AppState extends State<App> {
     if (!mounted) return;
     setState(() {
       _signedIn = false;
-      _loginBanner = 'Your session has expired. Please sign in again.';
+      _loginBanner = 'Սեսիան ավարտվել է, մուտք գործեք նորից';
     });
   }
 
@@ -65,17 +65,53 @@ class _AppState extends State<App> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'crm-voice-app',
+      title: 'Ձայնագրում',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF252D46),
+          primary: const Color(0xFF252D46),
+          surface: Colors.white,
+        ),
+        scaffoldBackgroundColor: Colors.white,
         useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          centerTitle: false,
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF111111),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(54),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFFF5F5F7),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0xFF252D46)),
+          ),
+        ),
       ),
       home: _bootstrapping
           ? const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             )
           : _signedIn
-              ? RecordPage(
+              ? RecorderShellPage(
                   apiClient: _apiClient,
                   onLogout: _logout,
                 )

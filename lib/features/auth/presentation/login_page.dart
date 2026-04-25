@@ -53,7 +53,7 @@ class _LoginPageState extends State<LoginPage> {
         await widget.tokenStorage.clear();
         if (!mounted) return;
         setState(() {
-          _error = 'Only administrators can use this app.';
+          _error = 'Միայն ադմինիստրատորը կարող է օգտվել հավելվածից';
           _loading = false;
         });
         return;
@@ -66,12 +66,13 @@ class _LoginPageState extends State<LoginPage> {
       widget.onLoggedIn();
     } on ApiException catch (e) {
       setState(() {
-        _error = e.message;
+        _error =
+            e.statusCode == 401 ? 'Սխալ էլ. հասցե կամ գաղտնաբառ' : e.message;
         _loading = false;
       });
     } catch (_) {
       setState(() {
-        _error = 'Something went wrong. Please try again.';
+        _error = 'Չհաջողվեց մուտք գործել';
         _loading = false;
       });
     }
@@ -81,91 +82,128 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: ListView(
-              padding: const EdgeInsets.all(24),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              children: [
-                Text(
-                  'crm-voice-app',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Administrator sign-in',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                  textAlign: TextAlign.center,
-                ),
-                if (widget.bannerMessage != null) ...[
-                  const SizedBox(height: 16),
-                  Card(
-                    color:
-                        Theme.of(context).colorScheme.surfaceContainerHighest,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(child: Text(widget.bannerMessage!)),
-                        ],
-                      ),
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: _LoginForm(
+                      email: _email,
+                      password: _password,
+                      loading: _loading,
+                      error: _error,
+                      bannerMessage: widget.bannerMessage,
+                      onSubmit: _submit,
                     ),
                   ),
-                ],
-                const SizedBox(height: 24),
-                AutofillGroup(
-                  child: Column(
-                    children: [
-                      AppTextField(
-                        controller: _email,
-                        label: 'Email',
-                        hint: 'you@example.com',
-                        keyboardType: TextInputType.emailAddress,
-                        autofillHints: const [AutofillHints.email],
-                        textInputAction: TextInputAction.next,
-                        enabled: !_loading,
-                      ),
-                      const SizedBox(height: 16),
-                      AppTextField(
-                        controller: _password,
-                        label: 'Password',
-                        obscure: true,
-                        autofillHints: const [AutofillHints.password],
-                        textInputAction: TextInputAction.done,
-                        enabled: !_loading,
-                      ),
-                    ],
-                  ),
                 ),
-                const SizedBox(height: 24),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Text(
-                      _error!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ),
-                AppButton(
-                  label: 'Sign in',
-                  loading: _loading,
-                  onPressed: _loading ? null : _submit,
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
+    );
+  }
+}
+
+class _LoginForm extends StatelessWidget {
+  const _LoginForm({
+    required this.email,
+    required this.password,
+    required this.loading,
+    required this.error,
+    required this.bannerMessage,
+    required this.onSubmit,
+  });
+
+  final TextEditingController email;
+  final TextEditingController password;
+  final bool loading;
+  final String? error;
+  final String? bannerMessage;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Մուտք',
+          style: Theme.of(context).textTheme.headlineMedium,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Մուտք գործեք ադմինիստրատորի հաշվով',
+          style: Theme.of(context).textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
+        if (bannerMessage != null) ...[
+          const SizedBox(height: 16),
+          Card(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(bannerMessage!)),
+                ],
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 24),
+        AutofillGroup(
+          child: Column(
+            children: [
+              AppTextField(
+                controller: email,
+                label: 'Էլ. հասցե',
+                hint: 'you@example.com',
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                textInputAction: TextInputAction.next,
+                enabled: !loading,
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: password,
+                label: 'Գաղտնաբառ',
+                obscure: true,
+                autofillHints: const [AutofillHints.password],
+                textInputAction: TextInputAction.done,
+                enabled: !loading,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        AppButton(
+          label: 'Մուտք գործել',
+          loading: loading,
+          onPressed: loading ? null : onSubmit,
+        ),
+      ],
     );
   }
 }

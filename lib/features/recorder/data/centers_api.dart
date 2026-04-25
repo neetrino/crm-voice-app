@@ -12,15 +12,21 @@ class CentersApi {
   Future<List<CenterModel>> fetchCenters() async {
     try {
       final res = await _client.getJson('/admin/centers');
-      final data = res.data;
-      if (data is! List<dynamic>) {
-        throw ApiException('Unexpected centers response.');
-      }
-      return data
+      final rawList = _centersResponseToList(res.data);
+      return rawList
           .map((e) => CenterModel.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
   }
+}
+
+List<dynamic> _centersResponseToList(Object? data) {
+  if (data is Map<String, dynamic>) {
+    final items = data['items'];
+    if (items is List<dynamic>) return items;
+  }
+  if (data is List<dynamic>) return data;
+  throw ApiException('Չհաջողվեց բեռնել մասնաճյուղերը');
 }

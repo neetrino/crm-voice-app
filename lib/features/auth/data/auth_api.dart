@@ -18,7 +18,7 @@ class AuthApi {
       );
       final data = res.data;
       if (data is! Map<String, dynamic>) {
-        throw ApiException('Unexpected response from server.');
+        throw ApiException('Սերվերից ստացվեց անսպասելի պատասխան։');
       }
       return AuthResponse.fromJson(data);
     } on DioException catch (e) {

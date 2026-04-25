@@ -1,27 +1,28 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../../core/config/app_config.dart';
-import '../../../core/network/api_exception.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/loading_view.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../core/utils/formatters.dart';
 import '../data/centers_api.dart';
 import '../data/recordings_api.dart';
 import '../models/center_model.dart';
 import '../services/audio_recorder_service.dart';
+import 'widgets/center_selector_card.dart';
+import 'widgets/delete_recording_dialog.dart';
+import 'widgets/record_page_widgets.dart';
+import 'widgets/recording_waveform.dart';
 
 class RecordPage extends StatefulWidget {
   const RecordPage({
     super.key,
     required this.apiClient,
-    required this.onLogout,
+    this.onRecordingUploaded,
   });
 
   final ApiClient apiClient;
-  final VoidCallback onLogout;
+  final VoidCallback? onRecordingUploaded;
 
   @override
   State<RecordPage> createState() => _RecordPageState();
@@ -38,14 +39,24 @@ class _RecordPageState extends State<RecordPage> {
   String? _selectedCenterId;
 
   bool _recording = false;
+  bool _uploading = false;
   String? _filePath;
   int _durationSec = 0;
   Stopwatch? _stopwatch;
   Timer? _tick;
-
-  bool _uploading = false;
   String? _error;
   String? _success;
+
+  bool get _hasRecording => _filePath != null && !_recording;
+  CenterModel? get _selectedCenter {
+    final selectedId = _selectedCenterId;
+    if (selectedId == null) return null;
+
+    for (final center in _centers) {
+      if (center.id == selectedId) return center;
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -65,70 +76,75 @@ class _RecordPageState extends State<RecordPage> {
       _loadingCenters = true;
       _centersError = null;
     });
+
     try {
       final list = await _centersApi.fetchCenters();
       if (!mounted) return;
       setState(() {
         _centers = list;
         _loadingCenters = false;
-        if (list.isEmpty) {
-          _selectedCenterId = null;
-        } else if (_selectedCenterId == null ||
-            !list.any((c) => c.id == _selectedCenterId)) {
-          _selectedCenterId = list.first.id;
-        }
+        _selectedCenterId = _initialCenterId(list);
       });
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _centersError = e.message;
-        _loadingCenters = false;
-      });
+      _setCentersError(e.message);
     } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _centersError = 'Could not load centers.';
-        _loadingCenters = false;
-      });
+      _setCentersError('Չհաջողվեց բեռնել մասնաճյուղերը');
     }
+  }
+
+  String? _initialCenterId(List<CenterModel> list) {
+    final selected = _selectedCenterId;
+    if (selected != null && list.any((center) => center.id == selected)) {
+      return selected;
+    }
+    return null;
+  }
+
+  void _setCentersError(String message) {
+    if (!mounted) return;
+    setState(() {
+      _centersError = message;
+      _loadingCenters = false;
+    });
   }
 
   void _beginTick() {
     _tick?.cancel();
     _tick = Timer.periodic(const Duration(milliseconds: 250), (_) {
       if (!_recording || _stopwatch == null) return;
-      final sec = _stopwatch!.elapsed.inSeconds;
-      if (mounted) setState(() => _durationSec = sec);
+      if (mounted) {
+        setState(() => _durationSec = _stopwatch!.elapsed.inSeconds);
+      }
     });
   }
 
-  Future<void> _toggleRecord() async {
+  Future<void> _startRecording() async {
     setState(() {
       _error = null;
       _success = null;
     });
-    if (!_recording) {
-      try {
-        await _audio.startRecording();
-        _stopwatch = Stopwatch()..start();
-        setState(() {
-          _recording = true;
-          _filePath = _audio.currentPath;
-          _durationSec = 0;
-        });
-        _beginTick();
-      } on StateError catch (e) {
-        setState(() => _error = e.message);
-      } catch (_) {
-        setState(() => _error = 'Could not start recording.');
-      }
-      return;
-    }
 
+    try {
+      await _audio.startRecording();
+      _stopwatch = Stopwatch()..start();
+      setState(() {
+        _recording = true;
+        _filePath = _audio.currentPath;
+        _durationSec = 0;
+      });
+      _beginTick();
+    } on StateError {
+      setState(() => _error = 'Միկրոֆոնի հասանելիությունը մերժված է');
+    } catch (_) {
+      setState(() => _error = 'Չհաջողվեց սկսել ձայնագրությունը');
+    }
+  }
+
+  Future<void> _stopRecording() async {
     _tick?.cancel();
     _stopwatch?.stop();
-    final sw = _stopwatch;
-    final elapsedSec = sw == null ? 0 : sw.elapsed.inSeconds;
+    final elapsedSec = _stopwatch?.elapsed.inSeconds ?? 0;
+
     try {
       final path = await _audio.stopRecording();
       if (!mounted) return;
@@ -141,7 +157,7 @@ class _RecordPageState extends State<RecordPage> {
       if (!mounted) return;
       setState(() {
         _recording = false;
-        _error = 'Could not stop recording.';
+        _error = 'Չհաջողվեց ավարտել ձայնագրությունը';
       });
     }
   }
@@ -149,16 +165,22 @@ class _RecordPageState extends State<RecordPage> {
   Future<void> _upload() async {
     final centerId = _selectedCenterId;
     final path = _filePath;
-    if (centerId == null || path == null) return;
-    if (_durationSec < 1) {
-      setState(() => _error = 'Recording must be at least 1 second.');
+    if (centerId == null) {
+      setState(() => _error = 'Ընտրեք մասնաճյուղը');
       return;
     }
+    if (path == null) return;
+    if (_durationSec < 1) {
+      setState(() => _error = 'Ձայնագրությունը շատ կարճ է');
+      return;
+    }
+
     setState(() {
       _uploading = true;
       _error = null;
       _success = null;
     });
+
     try {
       await _recordingsApi.uploadRecording(
         filePath: path,
@@ -166,29 +188,30 @@ class _RecordPageState extends State<RecordPage> {
         durationSec: _durationSec,
       );
       if (!mounted) return;
+      widget.onRecordingUploaded?.call();
       setState(() {
         _uploading = false;
-        _success = 'Upload successful. A new CRM card was created.';
+        _success = 'Ձայնագրությունը պահպանվեց';
         _filePath = null;
         _durationSec = 0;
         _stopwatch = null;
       });
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _uploading = false;
-        _error = e.message;
-      });
+      _setUploadError(e.message);
     } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _uploading = false;
-        _error = 'Upload failed. Please try again.';
-      });
+      _setUploadError('Չհաջողվեց պահպանել ձայնագրությունը');
     }
   }
 
-  void _resetRecording() {
+  void _setUploadError(String message) {
+    if (!mounted) return;
+    setState(() {
+      _uploading = false;
+      _error = message;
+    });
+  }
+
+  void _deleteRecording() {
     if (_recording) return;
     setState(() {
       _filePath = null;
@@ -199,119 +222,65 @@ class _RecordPageState extends State<RecordPage> {
     });
   }
 
-  String _statusLabel() {
-    if (_uploading) return 'Uploading...';
-    if (_recording) return 'Recording...';
-    if (_filePath != null) return 'Recorded';
-    return 'Ready';
+  Future<void> _confirmDeleteRecording() async {
+    if (_recording) return;
+    final confirmed = await showDeleteRecordingDialog(context);
+    if (!mounted || !confirmed) return;
+    _deleteRecording();
   }
 
   @override
   Widget build(BuildContext context) {
-    final canUpload = !_recording &&
-        !_uploading &&
-        _filePath != null &&
-        (_selectedCenterId != null) &&
-        _durationSec >= 1;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Voice Recorder'),
-        actions: [
-          TextButton(
-            onPressed: _uploading ? null : widget.onLogout,
-            child: const Text('Logout'),
+    return SafeArea(
+      top: false,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        children: [
+          CenterSelectorCard(
+            centers: _centers,
+            selectedCenter: _selectedCenter,
+            isLoading: _loadingCenters,
+            errorMessage: _centersError,
+            enabled: !_uploading && !_recording,
+            onRetry: _loadCenters,
+            onChanged: (center) =>
+                setState(() => _selectedCenterId = center.id),
           ),
+          const SizedBox(height: 30),
+          Text(
+            formatClockDuration(_durationSec),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -1.5,
+                  color: const Color(0xFF111111),
+                ),
+          ),
+          const SizedBox(height: 22),
+          RecordingWaveform(
+            isRecording: _recording,
+            hasRecording: _hasRecording,
+          ),
+          const SizedBox(height: 28),
+          RecordActionButtons(
+            recording: _recording,
+            uploading: _uploading,
+            hasRecording: _hasRecording,
+            canSave: _canSave,
+            onStart: _startRecording,
+            onStop: _stopRecording,
+            onSave: _upload,
+            onDelete: _confirmDeleteRecording,
+          ),
+          if (_uploading) const StatusMessage(text: 'Պահպանվում է...'),
+          if (_error != null) StatusMessage(text: _error!, isError: true),
+          if (_success != null) StatusMessage(text: _success!),
         ],
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            if (kDebugMode)
-              Text(
-                'API: ${AppConfig.apiBaseUrl}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            if (_loadingCenters)
-              const LoadingView(message: 'Loading centers...'),
-            if (_centersError != null && !_loadingCenters)
-              Text(
-                _centersError!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            if (!_loadingCenters && _centersError == null && _centers.isEmpty)
-              const Text('No active centers available.'),
-            if (!_loadingCenters && _centers.isNotEmpty) ...[
-              DropdownMenu<String>(
-                key: ValueKey(
-                  'center_${_centers.length}_$_selectedCenterId',
-                ),
-                initialSelection: _selectedCenterId,
-                enabled: !_uploading && !_recording,
-                label: const Text('Center'),
-                onSelected: (v) => setState(() => _selectedCenterId = v),
-                dropdownMenuEntries: [
-                  for (final c in _centers)
-                    DropdownMenuEntry<String>(
-                      value: c.id,
-                      label: c.name,
-                    ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 24),
-            Text('Status: ${_statusLabel()}'),
-            const SizedBox(height: 8),
-            Text('Duration: ${_durationSec}s'),
-            const SizedBox(height: 24),
-            Center(
-              child: SizedBox(
-                height: 88,
-                width: 88,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    shape: const CircleBorder(),
-                    padding: EdgeInsets.zero,
-                  ),
-                  onPressed: _uploading ? null : _toggleRecord,
-                  child: Icon(
-                    _recording ? Icons.stop : Icons.mic,
-                    size: 40,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            AppButton(
-              label: 'Upload',
-              loading: _uploading,
-              onPressed: canUpload ? _upload : null,
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: (_uploading || _recording || _filePath == null)
-                  ? null
-                  : _resetRecording,
-              child: const Text('Record again'),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 16),
-              Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ],
-            if (_success != null) ...[
-              const SizedBox(height: 16),
-              Text(
-                _success!,
-                style: TextStyle(color: Theme.of(context).colorScheme.primary),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
+  }
+
+  bool get _canSave {
+    return !_recording && !_uploading && _filePath != null && _durationSec >= 1;
   }
 }
