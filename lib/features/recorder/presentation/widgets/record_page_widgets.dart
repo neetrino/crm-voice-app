@@ -16,7 +16,6 @@ class RecordActionButtons extends StatelessWidget {
     required this.onStart,
     required this.onStop,
     required this.onSave,
-    required this.onDelete,
   });
 
   final bool recording;
@@ -26,7 +25,6 @@ class RecordActionButtons extends StatelessWidget {
   final VoidCallback onStart;
   final VoidCallback onStop;
   final VoidCallback onSave;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -38,27 +36,10 @@ class RecordActionButtons extends StatelessWidget {
       );
     }
     if (hasRecording) {
-      return SizedBox(
-        height: 136,
-        child: Stack(
-          children: [
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: LargeButton(
-                label: 'Պահպանել',
-                onPressed: canSave ? onSave : null,
-                tone: RecordButtonTone.save,
-              ),
-            ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: DeleteRecordingButton(onPressed: onDelete),
-            ),
-          ],
-        ),
+      return LargeButton(
+        label: 'Պահպանել',
+        onPressed: canSave ? onSave : null,
+        tone: RecordButtonTone.save,
       );
     }
     return LargeButton(

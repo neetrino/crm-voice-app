@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/storage/token_storage.dart';
+import '../../../core/ui/app_toast.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../data/auth_api.dart';
@@ -30,7 +31,6 @@ class _LoginPageState extends State<LoginPage> {
   final _password = TextEditingController();
   late final AuthApi _authApi = AuthApi(widget.apiClient);
   bool _loading = false;
-  String? _error;
 
   @override
   void dispose() {
@@ -40,10 +40,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _submit() async {
-    setState(() {
-      _error = null;
-      _loading = true;
-    });
+    setState(() => _loading = true);
     try {
       final res = await _authApi.login(
         _email.text.trim(),
@@ -52,10 +49,9 @@ class _LoginPageState extends State<LoginPage> {
       if (res.user.role != 'ADMIN') {
         await widget.tokenStorage.clear();
         if (!mounted) return;
-        setState(() {
-          _error = 'Միայն ադմինիստրատորը կարող է օգտվել հավելվածից';
-          _loading = false;
-        });
+        setState(() => _loading = false);
+        showErrorToast(
+            context, 'Միայն ադմինիստրատորը կարող է օգտվել հավելվածից');
         return;
       }
       await widget.tokenStorage.saveTokens(
@@ -65,16 +61,15 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       widget.onLoggedIn();
     } on ApiException catch (e) {
-      setState(() {
-        _error =
-            e.statusCode == 401 ? 'Սխալ էլ. հասցե կամ գաղտնաբառ' : e.message;
-        _loading = false;
-      });
+      if (!mounted) return;
+      final message =
+          e.statusCode == 401 ? 'Սխալ էլ. հասցե կամ գաղտնաբառ' : e.message;
+      setState(() => _loading = false);
+      showErrorToast(context, message);
     } catch (_) {
-      setState(() {
-        _error = 'Չհաջողվեց մուտք գործել';
-        _loading = false;
-      });
+      if (!mounted) return;
+      setState(() => _loading = false);
+      showErrorToast(context, 'Չհաջողվեց մուտք գործել');
     }
   }
 
@@ -96,7 +91,6 @@ class _LoginPageState extends State<LoginPage> {
                       email: _email,
                       password: _password,
                       loading: _loading,
-                      error: _error,
                       bannerMessage: widget.bannerMessage,
                       onSubmit: _submit,
                     ),
@@ -116,7 +110,6 @@ class _LoginForm extends StatelessWidget {
     required this.email,
     required this.password,
     required this.loading,
-    required this.error,
     required this.bannerMessage,
     required this.onSubmit,
   });
@@ -124,7 +117,6 @@ class _LoginForm extends StatelessWidget {
   final TextEditingController email;
   final TextEditingController password;
   final bool loading;
-  final String? error;
   final String? bannerMessage;
   final VoidCallback onSubmit;
 
@@ -190,14 +182,6 @@ class _LoginForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        if (error != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Text(
-              error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ),
         AppButton(
           label: 'Մուտք գործել',
           loading: loading,

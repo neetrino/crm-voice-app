@@ -13,6 +13,7 @@ class CenterSelectorShell extends StatelessWidget {
     required this.trailing,
     required this.enabled,
     required this.onTap,
+    this.compact = false,
   });
 
   final String value;
@@ -20,10 +21,11 @@ class CenterSelectorShell extends StatelessWidget {
   final Widget trailing;
   final bool enabled;
   final VoidCallback? onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    const radius = BorderRadius.all(Radius.circular(24));
+    final radius = BorderRadius.all(Radius.circular(compact ? 18 : 24));
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 180),
@@ -34,12 +36,12 @@ class CenterSelectorShell extends StatelessWidget {
           borderRadius: radius,
           onTap: onTap,
           child: Ink(
-            padding: const EdgeInsets.all(18),
-            decoration: const BoxDecoration(
+            padding: EdgeInsets.all(compact ? 12 : 18),
+            decoration: BoxDecoration(
               color: _surface,
               borderRadius: radius,
-              border: Border.fromBorderSide(BorderSide(color: _border)),
-              boxShadow: [
+              border: const Border.fromBorderSide(BorderSide(color: _border)),
+              boxShadow: const [
                 BoxShadow(
                   color: Color(0x0F000000),
                   blurRadius: 24,
@@ -49,14 +51,18 @@ class CenterSelectorShell extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const _SelectorIcon(),
-                const SizedBox(width: 14),
+                _SelectorIcon(compact: compact),
+                SizedBox(width: compact ? 10 : 14),
                 Expanded(
-                  child: _SelectorText(value: value, valueColor: valueColor),
+                  child: _SelectorText(
+                    value: value,
+                    valueColor: valueColor,
+                    compact: compact,
+                  ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: compact ? 8 : 12),
                 IconTheme(
-                  data: const IconThemeData(color: _accent, size: 24),
+                  data: IconThemeData(color: _accent, size: compact ? 22 : 24),
                   child: trailing,
                 ),
               ],
@@ -69,27 +75,35 @@ class CenterSelectorShell extends StatelessWidget {
 }
 
 class _SelectorIcon extends StatelessWidget {
-  const _SelectorIcon();
+  const _SelectorIcon({required this.compact});
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 46,
-      height: 46,
-      decoration: const BoxDecoration(
-        color: Color(0x1A252D46),
-        borderRadius: BorderRadius.all(Radius.circular(16)),
+      width: compact ? 38 : 46,
+      height: compact ? 38 : 46,
+      decoration: BoxDecoration(
+        color: const Color(0x1A252D46),
+        borderRadius: BorderRadius.all(Radius.circular(compact ? 14 : 16)),
       ),
-      child: const Icon(Icons.apartment_rounded, color: _accent, size: 23),
+      child: Icon(Icons.apartment_rounded,
+          color: _accent, size: compact ? 20 : 23),
     );
   }
 }
 
 class _SelectorText extends StatelessWidget {
-  const _SelectorText({required this.value, required this.valueColor});
+  const _SelectorText({
+    required this.value,
+    required this.valueColor,
+    required this.compact,
+  });
 
   final String value;
   final Color valueColor;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -105,14 +119,14 @@ class _SelectorText extends StatelessWidget {
             letterSpacing: 0.1,
           ),
         ),
-        const SizedBox(height: 5),
+        SizedBox(height: compact ? 3 : 5),
         Text(
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: valueColor,
-            fontSize: 17,
+            fontSize: compact ? 15 : 17,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.2,
           ),

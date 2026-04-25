@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/ui/app_toast.dart';
 import '../../../core/utils/formatters.dart';
 import '../data/centers_api.dart';
 import '../data/recordings_api.dart';
@@ -44,8 +45,6 @@ class _RecordPageState extends State<RecordPage> {
   int _durationSec = 0;
   Stopwatch? _stopwatch;
   Timer? _tick;
-  String? _error;
-  String? _success;
 
   bool get _hasRecording => _filePath != null && !_recording;
   CenterModel? get _selectedCenter {
@@ -119,11 +118,6 @@ class _RecordPageState extends State<RecordPage> {
   }
 
   Future<void> _startRecording() async {
-    setState(() {
-      _error = null;
-      _success = null;
-    });
-
     try {
       await _audio.startRecording();
       _stopwatch = Stopwatch()..start();
@@ -134,9 +128,11 @@ class _RecordPageState extends State<RecordPage> {
       });
       _beginTick();
     } on StateError {
-      setState(() => _error = 'Միկրոֆոնի հասանելիությունը մերժված է');
+      if (!mounted) return;
+      showErrorToast(context, 'Միկրոֆոնի հասանելիությունը մերժված է');
     } catch (_) {
-      setState(() => _error = 'Չհաջողվեց սկսել ձայնագրությունը');
+      if (!mounted) return;
+      showErrorToast(context, 'Չհաջողվեց սկսել ձայնագրությունը');
     }
   }
 
@@ -152,13 +148,14 @@ class _RecordPageState extends State<RecordPage> {
         _recording = false;
         _filePath = path;
         _durationSec = elapsedSec;
+        _selectedCenterId = null;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _recording = false;
-        _error = 'Չհաջողվեց ավարտել ձայնագրությունը';
       });
+      showErrorToast(context, 'Չհաջողվեց ավարտել ձայնագրությունը');
     }
   }
 
@@ -166,19 +163,17 @@ class _RecordPageState extends State<RecordPage> {
     final centerId = _selectedCenterId;
     final path = _filePath;
     if (centerId == null) {
-      setState(() => _error = 'Ընտրեք մասնաճյուղը');
+      showErrorToast(context, 'Ընտրեք մասնաճյուղը');
       return;
     }
     if (path == null) return;
     if (_durationSec < 1) {
-      setState(() => _error = 'Ձայնագրությունը շատ կարճ է');
+      showErrorToast(context, 'Ձայնագրությունը շատ կարճ է');
       return;
     }
 
     setState(() {
       _uploading = true;
-      _error = null;
-      _success = null;
     });
 
     try {
@@ -191,11 +186,12 @@ class _RecordPageState extends State<RecordPage> {
       widget.onRecordingUploaded?.call();
       setState(() {
         _uploading = false;
-        _success = 'Ձայնագրությունը պահպանվեց';
         _filePath = null;
         _durationSec = 0;
         _stopwatch = null;
+        _selectedCenterId = null;
       });
+      showSuccessToast(context, 'Ձայնագրությունը պահպանվեց');
     } on ApiException catch (e) {
       _setUploadError(e.message);
     } catch (_) {
@@ -207,8 +203,8 @@ class _RecordPageState extends State<RecordPage> {
     if (!mounted) return;
     setState(() {
       _uploading = false;
-      _error = message;
     });
+    showErrorToast(context, message);
   }
 
   void _deleteRecording() {
@@ -216,9 +212,8 @@ class _RecordPageState extends State<RecordPage> {
     setState(() {
       _filePath = null;
       _durationSec = 0;
-      _success = null;
-      _error = null;
       _stopwatch = null;
+      _selectedCenterId = null;
     });
   }
 
@@ -233,50 +228,61 @@ class _RecordPageState extends State<RecordPage> {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      child: Stack(
         children: [
-          CenterSelectorCard(
-            centers: _centers,
-            selectedCenter: _selectedCenter,
-            isLoading: _loadingCenters,
-            errorMessage: _centersError,
-            enabled: !_uploading && !_recording,
-            onRetry: _loadCenters,
-            onChanged: (center) =>
-                setState(() => _selectedCenterId = center.id),
+          ListView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+            children: [
+              CenterSelectorCard(
+                centers: _centers,
+                selectedCenter: _selectedCenter,
+                isLoading: _loadingCenters,
+                errorMessage: _centersError,
+                enabled: !_uploading && !_recording,
+                onRetry: _loadCenters,
+                onChanged: (center) =>
+                    setState(() => _selectedCenterId = center.id),
+              ),
+              const SizedBox(height: 30),
+              Text(
+                formatClockDuration(_durationSec),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -1.5,
+                      color: const Color(0xFF111111),
+                    ),
+              ),
+              const SizedBox(height: 22),
+              RecordingWaveform(
+                isRecording: _recording,
+                hasRecording: _hasRecording,
+              ),
+              const SizedBox(height: 28),
+              _buildMainActionButtons(),
+              if (_uploading) const StatusMessage(text: 'Պահպանվում է...'),
+            ],
           ),
-          const SizedBox(height: 30),
-          Text(
-            formatClockDuration(_durationSec),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -1.5,
-                  color: const Color(0xFF111111),
-                ),
-          ),
-          const SizedBox(height: 22),
-          RecordingWaveform(
-            isRecording: _recording,
-            hasRecording: _hasRecording,
-          ),
-          const SizedBox(height: 28),
-          RecordActionButtons(
-            recording: _recording,
-            uploading: _uploading,
-            hasRecording: _hasRecording,
-            canSave: _canSave,
-            onStart: _startRecording,
-            onStop: _stopRecording,
-            onSave: _upload,
-            onDelete: _confirmDeleteRecording,
-          ),
-          if (_uploading) const StatusMessage(text: 'Պահպանվում է...'),
-          if (_error != null) StatusMessage(text: _error!, isError: true),
-          if (_success != null) StatusMessage(text: _success!),
+          if (_hasRecording && !_uploading)
+            Positioned(
+              right: 20,
+              bottom: 24,
+              child: DeleteRecordingButton(onPressed: _confirmDeleteRecording),
+            ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMainActionButtons() {
+    return RecordActionButtons(
+      recording: _recording,
+      uploading: _uploading,
+      hasRecording: _hasRecording,
+      canSave: _canSave,
+      onStart: _startRecording,
+      onStop: _stopRecording,
+      onSave: _upload,
     );
   }
 

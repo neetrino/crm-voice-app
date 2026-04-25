@@ -48,11 +48,12 @@ class _RecorderShellPageState extends State<RecorderShellPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_index == 0 ? 'Ձայնագրում' : 'Պատմություն'),
         actions: [
-          TextButton(
+          IconButton(
             onPressed: widget.onLogout,
-            child: const Text('Դուրս գալ'),
+            tooltip: 'Դուրս գալ',
+            color: const Color(0xFF252D46),
+            icon: const Icon(Icons.logout_rounded),
           ),
         ],
       ),

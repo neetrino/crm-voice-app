@@ -20,6 +20,7 @@ class CenterSelectorCard extends StatefulWidget {
     required this.onRetry,
     required this.onChanged,
     required this.enabled,
+    this.compact = false,
   });
 
   final List<CenterModel> centers;
@@ -29,6 +30,7 @@ class CenterSelectorCard extends StatefulWidget {
   final VoidCallback? onRetry;
   final ValueChanged<CenterModel> onChanged;
   final bool enabled;
+  final bool compact;
 
   @override
   State<CenterSelectorCard> createState() => _CenterSelectorCardState();
@@ -59,6 +61,7 @@ class _CenterSelectorCardState extends State<CenterSelectorCard> {
               trailing: state.trailing,
               enabled: widget.enabled,
               onTap: () => _toggleOverlay(constraints.maxWidth),
+              compact: widget.compact,
             ),
           );
         },
@@ -71,6 +74,7 @@ class _CenterSelectorCardState extends State<CenterSelectorCard> {
       trailing: state.trailing,
       enabled: widget.enabled,
       onTap: state.onTap,
+      compact: widget.compact,
     );
   }
 
@@ -163,6 +167,7 @@ class _CenterSelectorCardState extends State<CenterSelectorCard> {
                       trailing: state.trailing,
                       enabled: widget.enabled,
                       onTap: _closeOverlay,
+                      compact: widget.compact,
                     ),
                     const SizedBox(height: 8),
                     CenterSelectorMenu(

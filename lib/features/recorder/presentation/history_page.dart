@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/ui/app_toast.dart';
 import '../../../core/widgets/loading_view.dart';
 import '../data/centers_api.dart';
 import '../data/voice_history_api.dart';
@@ -43,7 +44,6 @@ class _HistoryPageState extends State<HistoryPage> {
   bool _isPlaying = false;
   bool _isLoadingAudio = false;
   String? _error;
-  String? _message;
   String? _activeLeadId;
   Duration _position = Duration.zero;
   Duration? _duration;
@@ -79,7 +79,6 @@ class _HistoryPageState extends State<HistoryPage> {
     setState(() {
       _loading = true;
       _error = null;
-      _message = null;
     });
 
     try {
@@ -104,6 +103,7 @@ class _HistoryPageState extends State<HistoryPage> {
       _error = message;
       _loading = false;
     });
+    showErrorToast(context, message);
   }
 
   void _onPlayerState(PlayerState state) {
@@ -183,7 +183,6 @@ class _HistoryPageState extends State<HistoryPage> {
       _isPlaying = false;
       _position = Duration.zero;
       _duration = fallbackDuration;
-      _message = null;
     });
 
     try {
@@ -252,9 +251,9 @@ class _HistoryPageState extends State<HistoryPage> {
     await _stopAndResetCurrentPlayback(clearActive: true);
     if (!mounted) return;
     setState(() {
-      _message = 'Չհաջողվեց միացնել ձայնագրությունը';
       _isLoadingAudio = false;
     });
+    showErrorToast(context, 'Չհաջողվեց միացնել ձայնագրությունը');
   }
 
   String _buildAudioUrl(VoiceRecordingHistoryItem item) {
@@ -289,7 +288,6 @@ class _HistoryPageState extends State<HistoryPage> {
     String centerId,
   ) async {
     setState(() {
-      _message = null;
       _updatingLeadIds.add(item.leadId);
     });
 
@@ -300,7 +298,7 @@ class _HistoryPageState extends State<HistoryPage> {
       );
       _replaceItem(updated ?? _fallbackUpdatedItem(item, centerId));
       if (!mounted) return;
-      setState(() => _message = 'Մասնաճյուղը թարմացվեց');
+      showSuccessToast(context, 'Մասնաճյուղը թարմացվեց');
     } on ApiException {
       _showUpdateError();
     } catch (_) {
@@ -335,7 +333,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   void _showUpdateError() {
     if (!mounted) return;
-    setState(() => _message = 'Չհաջողվեց թարմացնել մասնաճյուղը');
+    showErrorToast(context, 'Չհաջողվեց թարմացնել մասնաճյուղը');
   }
 
   @override
@@ -348,7 +346,6 @@ class _HistoryPageState extends State<HistoryPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         children: [
-          if (_message != null) _HistoryMessage(message: _message!),
           if (_items.isEmpty)
             const _EmptyHistory()
           else
@@ -396,24 +393,6 @@ class _HistoryError extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _HistoryMessage extends StatelessWidget {
-  const _HistoryMessage({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: TextStyle(color: Theme.of(context).colorScheme.primary),
       ),
     );
   }

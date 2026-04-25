@@ -90,7 +90,7 @@ class HistoryAudioPlayer extends StatelessWidget {
 
   int get _visibleSeconds {
     if (active) return position.inSeconds;
-    return 0;
+    return totalDuration.inSeconds;
   }
 
   double get _progressValue {

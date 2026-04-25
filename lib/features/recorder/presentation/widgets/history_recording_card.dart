@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../models/center_model.dart';
 import '../../models/voice_recording_history_item.dart';
+import 'center_selector_card.dart';
 import 'history_audio_player.dart';
 
 class HistoryRecordingCard extends StatelessWidget {
@@ -33,9 +34,7 @@ class HistoryRecordingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = centers.any((center) => center.id == item.centerId)
-        ? item.centerId
-        : null;
+    final selectedCenter = _selectedCenter;
 
     return Card(
       elevation: 0,
@@ -46,15 +45,23 @@ class HistoryRecordingCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _InfoRow(
-              label: 'Ամսաթիվ',
-              value: formatArmenianDateTime(item.createdAt),
+            CenterSelectorCard(
+              centers: centers,
+              selectedCenter: selectedCenter,
+              isLoading: false,
+              errorMessage: null,
+              onRetry: null,
+              enabled: !updating,
+              compact: true,
+              onChanged: (center) => _onDropdownChanged(center.id),
             ),
-            const SizedBox(height: 8),
-            _InfoRow(
-              label: 'Տևողություն',
-              value: formatClockDuration(item.durationSec),
-            ),
+            if (updating) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Թարմացվում է...',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
             const SizedBox(height: 14),
             HistoryAudioPlayer(
               enabled: item.hasPlayableAudio,
@@ -66,23 +73,10 @@ class HistoryRecordingCard extends StatelessWidget {
               onPressed: onPlayPressed,
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              initialValue: selected,
-              decoration: const InputDecoration(labelText: 'Մասնաճյուղ'),
-              hint: Text(item.centerName ?? 'Ընտրեք մասնաճյուղը'),
-              items: [
-                for (final center in centers)
-                  DropdownMenuItem(value: center.id, child: Text(center.name)),
-              ],
-              onChanged: updating ? null : _onDropdownChanged,
+            _InfoRow(
+              label: 'Ամսաթիվ',
+              value: formatArmenianDateTime(item.createdAt),
             ),
-            if (updating) ...[
-              const SizedBox(height: 10),
-              Text(
-                'Թարմացվում է...',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
           ],
         ),
       ),
@@ -92,6 +86,19 @@ class HistoryRecordingCard extends StatelessWidget {
   void _onDropdownChanged(String? value) {
     if (value == null || value == item.centerId) return;
     onCenterChanged(value);
+  }
+
+  CenterModel? get _selectedCenter {
+    final centerId = item.centerId;
+    if (centerId == null) return null;
+
+    for (final center in centers) {
+      if (center.id == centerId) return center;
+    }
+
+    final centerName = item.centerName;
+    if (centerName == null || centerName.isEmpty) return null;
+    return CenterModel(id: centerId, name: centerName);
   }
 
   Duration get _totalDuration {
