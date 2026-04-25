@@ -23,6 +23,7 @@ class HistoryAudioPlayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = _progressValue;
+    final visibleDuration = active ? position : totalDuration;
     final accent = enabled ? const Color(0xFF252D46) : const Color(0xFF9A9AA0);
 
     return Opacity(
@@ -61,12 +62,15 @@ class HistoryAudioPlayer extends StatelessWidget {
                         ),
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  _formatVoiceDuration(_visibleSeconds),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF1C1C1E),
-                        fontWeight: FontWeight.w600,
-                      ),
+                SizedBox(
+                  width: 44,
+                  child: Text(
+                    _formatVoiceDuration(visibleDuration.inSeconds),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF252D46),
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -86,11 +90,6 @@ class HistoryAudioPlayer extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  int get _visibleSeconds {
-    if (active) return position.inSeconds;
-    return totalDuration.inSeconds;
   }
 
   double get _progressValue {

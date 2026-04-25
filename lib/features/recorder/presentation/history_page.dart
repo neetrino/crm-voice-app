@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
@@ -176,6 +176,12 @@ class _HistoryPageState extends State<HistoryPage> {
   Future<void> _startNewPlayback(VoiceRecordingHistoryItem item) async {
     final audioPath = item.audioPath;
     if (audioPath == null || audioPath.isEmpty) return;
+    if (Platform.isIOS && _isWebm(item)) {
+      await _stopAndResetCurrentPlayback(clearActive: true);
+      if (!mounted) return;
+      showErrorToast(context, 'Այս ձայնագրությունը հասանելի չէ iOS-ում');
+      return;
+    }
     final audioUrl = _buildAudioUrl(item);
     final fallbackDuration = _durationFromItem(item);
 
@@ -190,24 +196,19 @@ class _HistoryPageState extends State<HistoryPage> {
     try {
       await _stopAndResetCurrentPlayback(clearActive: false);
       final headers = await _getPlaybackHeaders();
-      if (kDebugMode) {
-        _debugPlaybackStart(item, audioPath, audioUrl, headers);
-        await _debugPlaybackHttpCheck(audioUrl, headers);
-        debugPrint(
-          'History playback: just_audio method=AudioSource.uri, '
-          'processingStateBefore=${_player.processingState}',
-        );
-      }
-      await _player.setAudioSource(
-        AudioSource.uri(
-          Uri.parse(audioUrl),
+      if (Platform.isIOS) {
+        final localPath = await _downloadVoiceToTempFile(
+          item: item,
+          audioUrl: audioUrl,
           headers: headers,
-        ),
-      );
-      if (kDebugMode) {
-        debugPrint(
-          'History playback: processingStateAfterSetAudioSource='
-          '${_player.processingState}',
+        );
+        await _player.setFilePath(localPath);
+      } else {
+        await _player.setAudioSource(
+          AudioSource.uri(
+            Uri.parse(audioUrl),
+            headers: headers,
+          ),
         );
       }
       if (!mounted) return;
@@ -219,25 +220,13 @@ class _HistoryPageState extends State<HistoryPage> {
       }));
       if (!mounted) return;
       setState(() => _isPlaying = true);
-    } on PlayerException catch (e, st) {
-      if (kDebugMode) {
-        debugPrint('History playback PlayerException code: ${e.code}');
-        debugPrint('History playback PlayerException message: ${e.message}');
-        debugPrint('History playback PlayerException index: ${e.index}');
-        debugPrintStack(stackTrace: st);
-      }
+    } on PlayerException {
       await _handlePlaybackFailure();
-    } on PlayerInterruptedException catch (e, st) {
-      if (kDebugMode) {
-        debugPrint('History playback PlayerInterruptedException: $e');
-        debugPrintStack(stackTrace: st);
-      }
+    } on PlayerInterruptedException {
       await _handlePlaybackFailure();
-    } catch (e, st) {
-      if (kDebugMode) {
-        debugPrint('History playback unknown error: $e');
-        debugPrintStack(stackTrace: st);
-      }
+    } on DioException {
+      await _handleDownloadFailure();
+    } catch (_) {
       await _handlePlaybackFailure();
     } finally {
       if (mounted && _isLoadingAudio) {
@@ -284,6 +273,15 @@ class _HistoryPageState extends State<HistoryPage> {
     showErrorToast(context, 'Չհաջողվեց միացնել ձայնագրությունը');
   }
 
+  Future<void> _handleDownloadFailure() async {
+    await _stopAndResetCurrentPlayback(clearActive: true);
+    if (!mounted) return;
+    setState(() {
+      _isLoadingAudio = false;
+    });
+    showErrorToast(context, 'Չհաջողվեց բեռնել ձայնագրությունը');
+  }
+
   String _buildAudioUrl(VoiceRecordingHistoryItem item) {
     final path = item.audioPath ?? '';
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
@@ -294,61 +292,58 @@ class _HistoryPageState extends State<HistoryPage> {
     return '$base${path.startsWith('/') ? path : '/$path'}';
   }
 
-  void _debugPlaybackStart(
-    VoiceRecordingHistoryItem item,
-    String audioPath,
-    String audioUrl,
-    Map<String, String> headers,
-  ) {
-    debugPrint(
-      'History playback debug: '
-      'isIOS=${Platform.isIOS}, '
-      'isAndroid=${Platform.isAndroid}, '
-      'leadId=${item.leadId}, '
-      'audioPath=$audioPath, '
-      'audioUrl=$audioUrl, '
-      'mimeType=${item.mimeType}, '
-      'durationSec=${item.durationSec}, '
-      'accessTokenExists=${headers.containsKey('Authorization')}, '
-      'containsEncodedSlash=${audioUrl.contains('%2F')}, '
-      'containsDoubleEncodedSlash=${audioUrl.contains('%252F')}',
+  Future<String> _downloadVoiceToTempFile({
+    required VoiceRecordingHistoryItem item,
+    required String audioUrl,
+    required Map<String, String> headers,
+  }) async {
+    final directory = await getTemporaryDirectory();
+    final file = File('${directory.path}/${_voiceCacheFileName(item)}');
+    if (await file.exists() && await file.length() > 0) return file.path;
+
+    final response = await widget.apiClient.dio.get<List<int>>(
+      audioUrl,
+      options: Options(headers: headers, responseType: ResponseType.bytes),
     );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        message: 'Downloaded voice file is empty.',
+      );
+    }
+    await file.writeAsBytes(bytes, flush: true);
+    return file.path;
   }
 
-  Future<void> _debugPlaybackHttpCheck(
-    String audioUrl,
-    Map<String, String> headers,
-  ) async {
-    try {
-      final response = await widget.apiClient.dio.get<List<int>>(
-        audioUrl,
-        options: Options(
-          headers: headers,
-          responseType: ResponseType.bytes,
-          followRedirects: false,
-          validateStatus: (status) => status != null && status < 500,
-        ),
-      );
-      final data = response.data ?? const <int>[];
-      debugPrint(
-        'History playback HTTP check: '
-        'statusCode=${response.statusCode}, '
-        'contentType=${response.headers.value(Headers.contentTypeHeader)}, '
-        'contentLength=${response.headers.value(Headers.contentLengthHeader)}, '
-        'location=${response.headers.value('location')}, '
-        'firstBytes=${data.take(16).join(',')}',
-      );
-    } on DioException catch (e, st) {
-      debugPrint(
-        'History playback HTTP check DioException: '
-        'type=${e.type}, statusCode=${e.response?.statusCode}, '
-        'message=${e.message}',
-      );
-      debugPrintStack(stackTrace: st);
-    } catch (e, st) {
-      debugPrint('History playback HTTP check unknown error: $e');
-      debugPrintStack(stackTrace: st);
+  String _voiceCacheFileName(VoiceRecordingHistoryItem item) {
+    final id = (item.recordingId == null || item.recordingId!.isEmpty)
+        ? item.leadId
+        : '${item.leadId}-${item.recordingId}';
+    return '${_safeFileName(id)}${_voiceFileExtension(item)}';
+  }
+
+  String _safeFileName(String value) {
+    return value.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+  }
+
+  String _voiceFileExtension(VoiceRecordingHistoryItem item) {
+    final audioPath = item.audioPath?.toLowerCase() ?? '';
+    final mimeType = item.mimeType?.toLowerCase() ?? '';
+    if (audioPath.endsWith('.webm') || mimeType.contains('webm')) {
+      return '.webm';
     }
+    if (audioPath.endsWith('.m4a') || mimeType == 'audio/mp4') {
+      return '.m4a';
+    }
+    return '.m4a';
+  }
+
+  bool _isWebm(VoiceRecordingHistoryItem item) {
+    final audioPath = item.audioPath?.toLowerCase() ?? '';
+    final mimeType = item.mimeType?.toLowerCase() ?? '';
+    return audioPath.endsWith('.webm') || mimeType.contains('webm');
   }
 
   Future<Map<String, String>> _getPlaybackHeaders() async {
