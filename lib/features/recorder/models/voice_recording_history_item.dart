@@ -5,6 +5,7 @@ class VoiceRecordingHistoryItem {
     this.recordingId,
     this.createdAt,
     this.audioPath,
+    this.mimeType,
     this.centerId,
     this.centerName,
   });
@@ -14,6 +15,7 @@ class VoiceRecordingHistoryItem {
   final DateTime? createdAt;
   final int durationSec;
   final String? audioPath;
+  final String? mimeType;
   final String? centerId;
   final String? centerName;
 
@@ -55,6 +57,11 @@ class VoiceRecordingHistoryItem {
             _mapValue(json['audio'])?['url'],
           ]) ??
           _storagePathFromR2Key(r2Key),
+      mimeType: _firstString([
+        json['mimeType'],
+        attachment?['mimeType'],
+        _mapValue(json['audio'])?['mimeType'],
+      ]),
       centerId: _stringValue(json['centerId']) ??
           _stringValue(center?['id']) ??
           _stringValue(attachment?['centerId']),
@@ -71,6 +78,7 @@ class VoiceRecordingHistoryItem {
     String? centerId,
     String? centerName,
     String? audioPath,
+    String? mimeType,
   }) {
     return VoiceRecordingHistoryItem(
       leadId: leadId,
@@ -78,6 +86,7 @@ class VoiceRecordingHistoryItem {
       createdAt: createdAt,
       durationSec: durationSec,
       audioPath: audioPath ?? this.audioPath,
+      mimeType: mimeType ?? this.mimeType,
       centerId: centerId ?? this.centerId,
       centerName: centerName ?? this.centerName,
     );
