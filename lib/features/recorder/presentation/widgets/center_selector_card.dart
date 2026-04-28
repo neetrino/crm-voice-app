@@ -21,6 +21,7 @@ class CenterSelectorCard extends StatefulWidget {
     required this.onChanged,
     required this.enabled,
     this.compact = false,
+    this.hasError = false,
   });
 
   final List<CenterModel> centers;
@@ -31,6 +32,7 @@ class CenterSelectorCard extends StatefulWidget {
   final ValueChanged<CenterModel> onChanged;
   final bool enabled;
   final bool compact;
+  final bool hasError;
 
   @override
   State<CenterSelectorCard> createState() => _CenterSelectorCardState();
@@ -62,6 +64,7 @@ class _CenterSelectorCardState extends State<CenterSelectorCard> {
               enabled: widget.enabled,
               onTap: () => _toggleOverlay(constraints.maxWidth),
               compact: widget.compact,
+              hasError: widget.hasError,
             ),
           );
         },
@@ -75,6 +78,7 @@ class _CenterSelectorCardState extends State<CenterSelectorCard> {
       enabled: widget.enabled,
       onTap: state.onTap,
       compact: widget.compact,
+      hasError: widget.hasError,
     );
   }
 
@@ -168,6 +172,7 @@ class _CenterSelectorCardState extends State<CenterSelectorCard> {
                       enabled: widget.enabled,
                       onTap: _closeOverlay,
                       compact: widget.compact,
+                      hasError: widget.hasError,
                     ),
                     const SizedBox(height: 8),
                     CenterSelectorMenu(

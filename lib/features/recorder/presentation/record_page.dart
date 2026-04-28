@@ -38,6 +38,7 @@ class _RecordPageState extends State<RecordPage> {
   bool _loadingCenters = true;
   String? _centersError;
   String? _selectedCenterId;
+  bool _showCenterRequiredError = false;
 
   bool _recording = false;
   bool _uploading = false;
@@ -148,7 +149,6 @@ class _RecordPageState extends State<RecordPage> {
         _recording = false;
         _filePath = path;
         _durationSec = elapsedSec;
-        _selectedCenterId = null;
       });
     } catch (_) {
       if (!mounted) return;
@@ -163,6 +163,9 @@ class _RecordPageState extends State<RecordPage> {
     final centerId = _selectedCenterId;
     final path = _filePath;
     if (centerId == null) {
+      setState(() {
+        _showCenterRequiredError = true;
+      });
       showErrorToast(context, 'Ընտրեք մասնաճյուղը');
       return;
     }
@@ -190,6 +193,7 @@ class _RecordPageState extends State<RecordPage> {
         _durationSec = 0;
         _stopwatch = null;
         _selectedCenterId = null;
+        _showCenterRequiredError = false;
       });
       showSuccessToast(context, 'Ձայնագրությունը պահպանվեց');
     } on ApiException catch (e) {
@@ -214,6 +218,7 @@ class _RecordPageState extends State<RecordPage> {
       _durationSec = 0;
       _stopwatch = null;
       _selectedCenterId = null;
+      _showCenterRequiredError = false;
     });
   }
 
@@ -240,8 +245,11 @@ class _RecordPageState extends State<RecordPage> {
                 errorMessage: _centersError,
                 enabled: !_uploading && !_recording,
                 onRetry: _loadCenters,
-                onChanged: (center) =>
-                    setState(() => _selectedCenterId = center.id),
+                hasError: _showCenterRequiredError,
+                onChanged: (center) => setState(() {
+                  _selectedCenterId = center.id;
+                  _showCenterRequiredError = false;
+                }),
               ),
               const SizedBox(height: 30),
               Text(

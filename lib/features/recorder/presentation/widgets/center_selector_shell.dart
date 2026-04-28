@@ -4,6 +4,8 @@ const _accent = Color(0xFF252D46);
 const _border = Color(0xFFE5E7EB);
 const _surface = Color(0xFFFFFFFF);
 const _secondaryText = Color(0xFF6B7280);
+const _errorRed = Color(0xFFDC2626);
+const _errorSurfaceTint = Color(0xFFFFF7F7);
 
 class CenterSelectorShell extends StatelessWidget {
   const CenterSelectorShell({
@@ -14,6 +16,7 @@ class CenterSelectorShell extends StatelessWidget {
     required this.enabled,
     required this.onTap,
     this.compact = false,
+    this.hasError = false,
   });
 
   final String value;
@@ -22,10 +25,14 @@ class CenterSelectorShell extends StatelessWidget {
   final bool enabled;
   final VoidCallback? onTap;
   final bool compact;
+  final bool hasError;
 
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.all(Radius.circular(compact ? 18 : 24));
+    final borderColor = hasError ? _errorRed : _border;
+    final surfaceColor = hasError ? _errorSurfaceTint : _surface;
+    final accentIcon = hasError ? _errorRed : _accent;
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 180),
@@ -38,9 +45,11 @@ class CenterSelectorShell extends StatelessWidget {
           child: Ink(
             padding: EdgeInsets.all(compact ? 12 : 18),
             decoration: BoxDecoration(
-              color: _surface,
+              color: surfaceColor,
               borderRadius: radius,
-              border: const Border.fromBorderSide(BorderSide(color: _border)),
+              border: Border.fromBorderSide(
+                BorderSide(color: borderColor, width: hasError ? 1.25 : 1),
+              ),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x0F000000),
@@ -51,7 +60,7 @@ class CenterSelectorShell extends StatelessWidget {
             ),
             child: Row(
               children: [
-                _SelectorIcon(compact: compact),
+                _SelectorIcon(compact: compact, hasError: hasError),
                 SizedBox(width: compact ? 10 : 14),
                 Expanded(
                   child: _SelectorText(
@@ -62,7 +71,8 @@ class CenterSelectorShell extends StatelessWidget {
                 ),
                 SizedBox(width: compact ? 8 : 12),
                 IconTheme(
-                  data: IconThemeData(color: _accent, size: compact ? 22 : 24),
+                  data:
+                      IconThemeData(color: accentIcon, size: compact ? 22 : 24),
                   child: trailing,
                 ),
               ],
@@ -75,21 +85,24 @@ class CenterSelectorShell extends StatelessWidget {
 }
 
 class _SelectorIcon extends StatelessWidget {
-  const _SelectorIcon({required this.compact});
+  const _SelectorIcon({required this.compact, this.hasError = false});
 
   final bool compact;
+  final bool hasError;
 
   @override
   Widget build(BuildContext context) {
+    final bg = hasError ? const Color(0x1ADC2626) : const Color(0x1A252D46);
+    final iconColor = hasError ? _errorRed : _accent;
     return Container(
       width: compact ? 38 : 46,
       height: compact ? 38 : 46,
       decoration: BoxDecoration(
-        color: const Color(0x1A252D46),
+        color: bg,
         borderRadius: BorderRadius.all(Radius.circular(compact ? 14 : 16)),
       ),
       child: Icon(Icons.apartment_rounded,
-          color: _accent, size: compact ? 20 : 23),
+          color: iconColor, size: compact ? 20 : 23),
     );
   }
 }
